@@ -1,0 +1,42 @@
+name: Test
+
+on: 
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+  
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Setup AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Setup Terraform CLI
+      uses: hashicorp/setup-terraform@v1.3.2
+
+    - name: Validate Datalake Infrastructure
+      run: |
+        cd artifacts/datalake
+        terraform init
+        terraform validate
+    
+    - name: Validate Network Infrastructure
+      run: |
+        cd ../network
+        terraform init
+        terraform validate
+
+    - name: Validate Permissions Infrastructure
+      run: |
+        cd ../permissions
+        terraform init
+        terraform validate
