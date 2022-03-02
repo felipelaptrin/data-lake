@@ -1,25 +1,25 @@
 # Data Lake
 
 ## Description
-This project aims to create a simple Data Lake using AWS infrastructure, composed by S3 and Glue Data Catalog. 
+This project aims to create a simple Data Lake using AWS infrastructure, composed of S3 and Glue Data Catalog. 
 To achieve this goal, the project targets three main topics: 
 - IaaC
 
-    Instead of building the infrastructure and interact with AWS services using the console, the entire infrastructure of this project was built using Terraform as a tool to implement and control the deploy infrastructure. All artifacts reside inside the `/artifacts` folder.
+    Instead of building the infrastructure and interacting with AWS services using the console, the entire infrastructure of this project was built using Terraform as a tool to implement and control the deployed infrastructure. All artifacts reside inside the `/artifacts` folder.
 
 - Data processing
 
-    All data processing were made using Spark inside EMR clusters. To garantee a low cost (since this is a proof of concept project) a pool of spot instances were used. The dataset used were saved in a colunar format (Parquet) with snappy compression algorith.
+    All data processing was made using Spark inside EMR clusters. To guarantee a low cost (since this is a proof of concept project) a pool of spot instances were used. The dataset used was saved in a columnar format (Parquet) with snappy compression algorithm.
 
 - CI/CD
     
-    To garantee a better approach by using good devops practices two workflow were created by using Github Actions. Pushes made into the `develop` branch validate the Terraform articts while pushes made into the `main` branch apply the artifacts.
+    To guarantee a better approach by using good devops practices two workflows were created by using Github Actions. Pushes made into the `develop` branch validate the Terraform artifacts while pushes made into the `main` branch apply the artifacts.
 
 ## Architecture
 
 The Terraform artifacts created are responsible for creating the following items:
 - S3
-    - Datalake bucket
+    - Data Lake bucket
 - IAM
     - IAM Role for EMR EC2 instances
     - IAM Service Role for EMR
@@ -36,7 +36,7 @@ The Terraform artifacts created are responsible for creating the following items
 
 ## Data Flow
 
-The above picture ilustrates the data flow of the Data Lake.
+The picture below ilustrates the data flow of the Data Lake.
 
 <p align="center">
   <img src="https://user-images.githubusercontent.com/52676348/156427525-3a8985fe-6f95-41a8-83b3-d23d64b19ef3.png" />
