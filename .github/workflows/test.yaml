@@ -31,12 +31,12 @@ jobs:
     
     - name: Validate Network Infrastructure
       run: |
-        cd ../network
+        cd artifacts/network
         terraform init
         terraform validate
 
     - name: Validate Permissions Infrastructure
       run: |
-        cd ../permissions
+        cd artifacts/permissions
         terraform init
         terraform validate
