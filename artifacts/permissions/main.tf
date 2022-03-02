@@ -10,7 +10,7 @@ terraform {
 
   backend "s3" {
     bucket = "terraform-states-flat"
-    key    = "states/datalake/network.tfstate"
+    key    = "states/datalake/permissions.tfstate"
     region = "us-east-1"
   }
 }
