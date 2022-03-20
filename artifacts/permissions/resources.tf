@@ -1,5 +1,5 @@
 resource "aws_iam_role" "emr_ec2_policy" {
-  name        = "EMR_EC2_ROLE_2"
+  name        = "EMR_EC2_ROLE"
   description = "This IAM Role is used by the EC2 instances used in a EMR Cluster"
   managed_policy_arns = [
     "arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceforEC2Role",
@@ -20,12 +20,12 @@ resource "aws_iam_role" "emr_ec2_policy" {
 }
 
 resource "aws_iam_instance_profile" "emr_ec2_instance_profile" {
-  name = "EMR_EC2_ROLE_2"
+  name = "EMR_EC2_ROLE"
   role = aws_iam_role.emr_ec2_policy.name
 }
 
 resource "aws_iam_role" "emr_service_policy" {
-  name                = "EMR_SERVICE_ROLE_2"
+  name                = "EMR_SERVICE_ROLE"
   description         = "This IAM Role is used as a service Role for EMR service"
   managed_policy_arns = ["arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceRole"]
   assume_role_policy = jsonencode({

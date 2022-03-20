@@ -3,30 +3,22 @@ import os
 
 import boto3
 
-from utils import get_bucket_name_from_terraform
+s3_datalake_bucket = "datalake-flat-937168356724"
 
 
-def get_subnet_name_from_terraform() -> str:
-    subnet = os.popen(
-        "echo $(terraform output -state=./artifacts/network/terraform.tfstate subnet)"
-    ).read()
-    subnet_without_quotes = subnet.strip()[1:-1]
-    return subnet_without_quotes
+def get_subnet_id_from_tfstate() -> str:
+    s3 = boto3.resource("s3")
+    content_object = s3.Object("terraform-states-flat", "states/datalake/network.tfstate")
+    file_content = content_object.get()["Body"].read().decode("utf-8")
+    json_content = json.loads(file_content)
+    return json_content["outputs"]["subnet"]["value"]
 
 
-def get_role_names_from_terraform() -> list:
-    roles = os.popen(
-        "echo $(terraform output -state=./artifacts/permissions/terraform.tfstate -json)"
-    ).read()
-    roles = json.loads(roles)
-    return [roles["emr_service_role"]["value"], roles["emr_ec2_role"]["value"]]
-
-
-def create_emr_cluster():
+def create_emr_cluster(s3_datalake_bucket: str):
     emr = boto3.client("emr", region_name="us-east-1")
     response = emr.run_job_flow(
         Name="Proccess Data",
-        LogUri=f"s3://emr-logs-{get_bucket_name_from_terraform()}",
+        LogUri=f"s3://emr-logs-{s3_datalake_bucket}",
         ReleaseLabel="emr-6.5.0",
         Applications=[
             {"Name": "Hadoop"},
@@ -36,7 +28,7 @@ def create_emr_cluster():
             {"Name": "JupyterEnterpriseGateway"},
         ],
         Instances={
-            "Ec2SubnetId": get_subnet_name_from_terraform(),
+            "Ec2SubnetId": get_subnet_id_from_tfstate(),
             "KeepJobFlowAliveWhenNoSteps": False,
             "TerminationProtected": False,
             "InstanceFleets": [
@@ -76,22 +68,30 @@ def create_emr_cluster():
                 },
             ],
         },
-        ServiceRole=get_role_names_from_terraform()[0],  # "EMR_DefaultRole"
-        JobFlowRole=get_role_names_from_terraform()[1],  # "EMR_EC2_DefaultRole",
+        ServiceRole="EMR_SERVICE_ROLE",
+        JobFlowRole="EMR_EC2_ROLE",
         Tags=[
             {"Key": "Environment", "Value": "Dev"},
             {"Key": "CreatedVia", "Value": "Boto3"},
+        ],
+        Configurations=[
+            {
+                "Classification": "spark-hive-site",
+                "Properties": {
+                    "hive.metastore.client.factory.class": "com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory",
+                    "hive.metastore.glue.catalogid": "acct-id",
+                },
+            }
         ],
     )
     return response["JobFlowId"]
 
 
-def move_script_to_s3():
+def move_script_to_s3(s3_datalake_bucket: str) -> str:
     s3 = boto3.resource("s3")
-    bucket_name = get_bucket_name_from_terraform()
-    key = "scripts/spark_processed.py"
+    bucket_name = s3_datalake_bucket
+    key = "scripts/spark_processing.py"
     current_file_path = os.path.dirname(os.path.realpath(__file__))
-
     s3.meta.client.upload_file(
         Filename=f"{current_file_path}/spark_processed.py",
         Bucket=bucket_name,
@@ -100,7 +100,7 @@ def move_script_to_s3():
     return f"s3://{bucket_name}/{key}"
 
 
-def process_data(job_flow_id: str, script_s3_path: str):
+def process_data(job_flow_id: str, script_s3_path: str, s3_datalake_bucket: str):
     emr = boto3.client("emr", region_name="us-east-1")
     emr.add_job_flow_steps(
         JobFlowId=job_flow_id,
@@ -115,7 +115,8 @@ def process_data(job_flow_id: str, script_s3_path: str):
                         "--deploy-mode",
                         "cluster",
                         script_s3_path,
-                        get_bucket_name_from_terraform(),
+                        f"s3://{s3_datalake_bucket}/raw-data/RAIS/2020/",
+                        f"s3://{s3_datalake_bucket}/staging/RAIS/",
                     ],
                 },
             }
@@ -123,17 +124,17 @@ def process_data(job_flow_id: str, script_s3_path: str):
     )
 
 
-def create_crawler(name: str):
+def create_crawler(name: str, s3_datalake_bucket: str):
     glue = boto3.client("glue", region_name="us-east-1")
     glue.create_crawler(
         Name=name,
         Role="Glue_Crawler_Role",
-        DatabaseName="processed",
+        DatabaseName="staging",
         Description="This crawler is used to create metadata",
         Targets={
             "S3Targets": [
                 {
-                    "Path": f"s3://{get_bucket_name_from_terraform()}/consumer-zone",
+                    "Path": f"s3://{s3_datalake_bucket}/staging",
                 },
             ],
         },
@@ -142,13 +143,8 @@ def create_crawler(name: str):
     )
 
 
-def start_crawler(name: str):
-    glue = boto3.client("glue", region_name="us-east-1")
-    glue.start_crawler(Name=name)
-
-
-script_s3_path = move_script_to_s3()
-job_flow_id = create_emr_cluster()
-process_data(job_flow_id, script_s3_path)
-create_crawler("CRAWLER - PROCESSED")
-# start_crawler("CRAWLER - PROCESSED")
+# PIPELINE
+script_s3_path = move_script_to_s3(s3_datalake_bucket)
+job_flow_id = create_emr_cluster(s3_datalake_bucket)
+process_data(job_flow_id, script_s3_path, s3_datalake_bucket)
+create_crawler("CRAWLER - PROCESSED", s3_datalake_bucket)
