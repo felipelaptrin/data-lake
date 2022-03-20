@@ -74,6 +74,15 @@ def create_emr_cluster(s3_datalake_bucket: str):
             {"Key": "Environment", "Value": "Dev"},
             {"Key": "CreatedVia", "Value": "Boto3"},
         ],
+        Configurations=[
+            {
+                "Classification": "spark-hive-site",
+                "Properties": {
+                    "hive.metastore.client.factory.class": "com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory",
+                    "hive.metastore.glue.catalogid": "acct-id",
+                },
+            }
+        ],
     )
     return response["JobFlowId"]
 
@@ -81,9 +90,8 @@ def create_emr_cluster(s3_datalake_bucket: str):
 def move_script_to_s3(s3_datalake_bucket: str) -> str:
     s3 = boto3.resource("s3")
     bucket_name = s3_datalake_bucket
-    key = "scripts/spark_processed.py"
+    key = "scripts/spark_processing.py"
     current_file_path = os.path.dirname(os.path.realpath(__file__))
-
     s3.meta.client.upload_file(
         Filename=f"{current_file_path}/spark_processed.py",
         Bucket=bucket_name,
@@ -107,7 +115,8 @@ def process_data(job_flow_id: str, script_s3_path: str, s3_datalake_bucket: str)
                         "--deploy-mode",
                         "cluster",
                         script_s3_path,
-                        s3_datalake_bucket,
+                        f"s3://{s3_datalake_bucket}/raw-data/RAIS/2020/",
+                        f"s3://{s3_datalake_bucket}/staging/RAIS/",
                     ],
                 },
             }
@@ -120,12 +129,12 @@ def create_crawler(name: str, s3_datalake_bucket: str):
     glue.create_crawler(
         Name=name,
         Role="Glue_Crawler_Role",
-        DatabaseName="processed",
+        DatabaseName="staging",
         Description="This crawler is used to create metadata",
         Targets={
             "S3Targets": [
                 {
-                    "Path": f"s3://{s3_datalake_bucket}/consumer-zone",
+                    "Path": f"s3://{s3_datalake_bucket}/staging",
                 },
             ],
         },
